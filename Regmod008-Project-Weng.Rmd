@@ -1,0 +1,97 @@
+---
+title: "Motor Trend Report: How shall I pick a car considering fuel economic?"
+output:
+  pdf_document:
+    fig_caption: yes
+  html_document: default
+---
+**Note** 1) I am not a native English speaker, so I was trying to pick the simplest words to aviod any protetial misunderstanding. Please forgive any wrong English usage or wrong spellings in this document. Thank you for your understanding. 2) Because of the space limit required by the Course Project, some of the R scripts were hiden in PDF. The reproduciable RMD file can be found:  https://github.com/
+
+
+## Briefing
+This document is to discuss how different variables could affect the fuel efficiency of a car. We will be using the mtcars dataset as our data for this study. And the fuel efficiency is measured by the mpg column (miles per gallon) in the data. We hope to figure out the question by researching at the relationship between a set of variables and miles per gallon (MPG). Particularly, we will focus on the following 2 questions:
+- “Is an automatic or manual transmission better for MPG”
+- "Quantify the MPG difference between automatic and manual transmissions"
+
+## Loading the data
+The data was extracted from the 1974 Motor Trend US magazine, and comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973–74 models).
+
+```{r, echo=FALSE}
+# Load data
+data(mtcars)
+
+# Convert flags to factors for easier handling
+mtcars$cyl  <- factor(mtcars$cyl)
+mtcars$vs   <- factor(mtcars$vs)
+mtcars$am   <- factor(mtcars$am)
+mtcars$gear <- factor(mtcars$gear)
+mtcars$carb <- factor(mtcars$carb)
+```
+
+## The transmission type vs miles per galon
+Let's start with talking about the transmission type. From Figure 1 in the Appendix, we can see that the average mpg is quite different for different transmission types, where the manual cars in the sample data are having bigger MPG outcomes, which is `r mean(mtcars$mpg[mtcars$am==1])` comparing with wich of the auto car `r mean(mtcars$mpg[mtcars$am==0])`. So now we will check the model by looking at the summary of the model: 
+```{r, echo=FALSE}
+fit_am <- lm(mpg ~ am, mtcars)
+```
+
+```{r, echo=FALSE}
+summary(fit_am)
+```
+From which we are getting an R-squared of 0.36, which suggestes that only 36% of the MPG variation can be explained by this model. Thus, even though there's this significant differences in the average MPG, we CANNOT say that it is the transmission type which itself decides the MPG outcome. There must be other factors which affect the MPG. We will looking into that in the following analysis
+
+## Adding in other variables
+We drawed a pair variable plot to search for any protential relationships with MPG in Figure 2 of the Appendix. Because we are only interested in the effect on MPG in this document, we only look at the first row and the first column of the plot. Where we can find out that it looks that cyl, disp, hp and wt are having strong relationships with MPG.
+Also, these variables, they seem to have relationships with each others too. For example by looking at the plot of cyl - disp, or hp - wt. So we will apply an multi-variable regression model here. And then we will evaluate the model with R's step function to find the one which the most significante refressors.
+```{r, echo=FALSE}
+# First, we build a model with all variables
+full.model <- lm(mpg ~ ., mtcars)
+# we use 'step' to select the model with the most significant variables
+best.model <- step(full.model, direction = "both", trace = 0)
+summary(best.model)
+```
+The final model includes cyl,hp, wt and am. The adjusted R squared is 0.84 now so it can explain 84% of the MPG variance. 
+
+Then we will exam our final model by looking at the residuals plots in Appendix - Figure 3.
+- There is no significant pattern shown in the Residuals vs Fitted. Thus, we didn't miss any important relations.
+- The residuals are distributed normally.
+- There is an outlier found in the Leverage plot. Which is the `r names(which.max(hatvalues(best.model)))`. Looking at the record, we can see that it has 335 horsepower (highest in the data) with 8 cylinders but accomplishes at 15 miles per gallon. So it is a "correct" outlier.
+
+## Results
+From the analysis above, we found out that the auto cars are having lower MPGs than the manual cars. The differencies is `r mean(mtcars$mpg[mtcars$am==1])- mean(mtcars$mpg[mtcars$am==0])` miles per gallon. However, it is not the transmision type which has a big effect on the MPG. It is the other variables behind it: cylinders, weight, horsepower which affect the MPG. The more cylinders, weights or horsepowers, the less MPG the car would have. The transmision type on the other hand, has a very small effect on the MPG.
+
+
+
+# Appendix
+```{r ,echo=FALSE, fig.cap="Figure 1 - MPG vs Transmission Type."}
+library(plyr)
+library(ggplot2)
+transmission <- revalue(mtcars$am, c('0'="auto", '1'="manual"))
+ggplot(mtcars, aes(x=transmission, y=mpg, fill=transmission)) +
+    geom_boxplot() +
+    xlab("Trans type") +
+    ylab("MPG")
+```
+
+
+```{r, echo=FALSE}
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt)
+}
+```
+
+```{r ,echo=FALSE, fig.cap="Figure 2 - Paired variable plots."}
+pairs(mtcars, upper.panel=panel.smooth, lower.panel=panel.cor)
+```
+
+
+```{r ,echo=FALSE, fig.cap="Figure 3 - Residual plots."}
+par(mfrow = c(2,2))
+plot(best.model)
+```
